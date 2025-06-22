@@ -126,19 +126,19 @@ The system uses SQLite for development and supports PostgreSQL for production de
 
 2. Set up Python virtual environment
    ```bash
-   # Use existing virtual environment at /Users/alokk/EmployDEX/venv or create if not present
-   if [ ! -d "/Users/alokk/EmployDEX/venv" ]; then
-     python -m venv /Users/alokk/EmployDEX/venv
+   # Use existing virtual environment at /Users/alokk/EmployDEX/Applications/venv or create if not present
+   if [ ! -d "/Users/alokk/EmployDEX//Applications/venv" ]; then
+     python -m venv /Users/alokk/EmployDEX/Applications/venv
    fi
-   source /Users/alokk/EmployDEX/venv/bin/activate
+   source /Users/alokk/EmployDEX/Applications/venv/bin/activate
    pip install -r requirements.txt
    ```
 
 3. Set up frontend dependencies
    ```bash
-   # Use node_modules at /Users/alokk/EmployDEX/node_modules or install locally
-   if [ ! -d "/Users/alokk/EmployDEX/node_modules" ]; then
-     mkdir -p /Users/alokk/EmployDEX/node_modules
+   # Use node_modules at /Users/alokk/EmployDEX/Applications/node_modules or install locally
+   if [ ! -d "/Users/alokk/EmployDEX/Applications/node_modules" ]; then
+     mkdir -p /Users/alokk/EmployDEX/Applications/node_modules
    fi
    cd frontend
    npm install
@@ -155,7 +155,7 @@ The system uses SQLite for development and supports PostgreSQL for production de
 
 1. Start the backend
    ```bash
-   source /Users/alokk/EmployDEX/venv/bin/activate
+   source /Users/alokk/EmployDEX/Applications/venv/bin/activate
    cd backend
    export FLASK_APP=wsgi.py
    export FLASK_ENV=development
