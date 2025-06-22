@@ -5,7 +5,7 @@ Handles API routing, documentation and monitoring
 import logging
 from flask import Blueprint, jsonify, request
 
-from backend.core.utils import json_response, handle_errors
+from backend.core.utils import APIResponse, handle_exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -13,17 +13,19 @@ logger = logging.getLogger(__name__)
 api_gateway_bp = Blueprint('api_gateway', __name__, url_prefix='/api')
 
 @api_gateway_bp.route('/status', methods=['GET'])
-@handle_errors
+@handle_exceptions
 def api_status():
     """API gateway status endpoint"""
-    return json_response({
-        'status': 'operational',
-        'version': '0.1.0',
-        'service': 'api_gateway'
-    })
+    return APIResponse.success(
+        data={
+            'status': 'operational',
+            'version': '0.1.0',
+            'service': 'api_gateway'
+        }
+    )
 
 @api_gateway_bp.route('/routes', methods=['GET'])
-@handle_errors
+@handle_exceptions
 def list_routes():
     """List all available API routes"""
     from flask import current_app
@@ -52,10 +54,12 @@ def list_routes():
             blueprints[blueprint] = []
         blueprints[blueprint].append(route)
     
-    return json_response({
-        'routes_count': len(routes),
-        'blueprints': blueprints
-    })
+    return APIResponse.success(
+        data={
+            'routes_count': len(routes),
+            'blueprints': blueprints
+        }
+    )
 
 # This will be expanded in future implementations to include:
 # - Request validation middleware

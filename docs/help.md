@@ -4,6 +4,46 @@
 
 The Modular Software Framework (MSF) is a comprehensive architecture designed to create reusable, independent software modules that can be seamlessly integrated into various applications. This framework enables developers to rapidly build applications by assembling pre-built, tested, and documented modules rather than developing every component from scratch.
 
+## Quick Start Guide
+
+### Installation
+
+1. **Backend Setup**:
+   ```bash
+   # Activate the virtual environment
+   source /Users/alokk/EmployDEX/Application/venv/bin/activate
+   
+   # Install dependencies
+   pip install -r requirements.txt
+   
+   # Start the server
+   cd backend
+   export FLASK_APP=wsgi.py
+   export FLASK_ENV=development
+   flask run --host=0.0.0.0 --port=5000
+   ```
+
+2. **Frontend Setup**:
+   ```bash
+   # Install dependencies
+   cd frontend
+   npm install
+   
+   # Start development server
+   npm start
+   
+   # View component library (optional)
+   npm run storybook
+   ```
+
+### Default Access
+
+- **Admin User**: admin
+- **Password**: admin
+- **Backend API**: http://localhost:5000
+- **Frontend UI**: http://localhost:3000
+- **Storybook**: http://localhost:6006
+
 ## Database Info
 
 The database structure for the Modular Software Framework follows a relational model with clearly defined tables for master data and transactions. The system uses SQLite for development environments and PostgreSQL for production deployments.
@@ -255,29 +295,162 @@ The system comes pre-configured with:
 
 ```
 ┌──────────┐          ┌──────────┐          ┌──────────┐          ┌──────────┐
-│ Module A │          │Event Bus │          │ Module B │          │ Database │
-└────┬─────┘          └────┬─────┘          └────┬─────┘          └────┬─────┘
-     │                     │                     │                     │
-     │  Publish Event      │                     │                     │
-     │────────────────────►│                     │                     │
-     │                     │                     │                     │
-     │                     │  Notify Subscribers │                     │
-     │                     │────────────────────►│                     │
-     │                     │                     │                     │
-     │                     │                     │  Database Operation │
-     │                     │                     │────────────────────►│
-     │                     │                     │                     │
-     │                     │                     │◄────────────────────│
-     │                     │                     │  Response           │
-     │                     │                     │                     │
-     │                     │◄────────────────────│                     │
-     │                     │  Event Response     │                     │
-     │                     │                     │                     │
-     │◄────────────────────│                     │                     │
-     │  Response           │                     │                     │
-┌────┴─────┐          ┌────┴─────┐          ┌────┴─────┐          ┌────┴─────┐
-│ Module A │          │Event Bus │          │ Module B │          │ Database │
-└──────────┘          └──────────┘          └──────────┘          └──────────┘
+│ Module A │          │Event Bus │          │ Module B │         ## Architecture Diagrams
+
+### System Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│                                  Client Layer                                      │
+│                                                                                    │
+│  ┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐ │
+│  │  Browser   │   │  Mobile    │   │  Desktop   │   │  API       │   │  Third-    │ │
+│  │  Client    │   │  App       │   │  App       │   │  Client    │   │  Party     │ │
+│  └────────────┘   └────────────┘   └────────────┘   └────────────┘   └────────────┘ │
+└────────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│                                API Gateway Layer                                   │
+│                                                                                    │
+│  ┌────────────────┐   ┌────────────────┐   ┌────────────────┐   ┌────────────────┐ │
+│  │  Authentication│   │  Request       │   │  Rate          │   │  API           │ │
+│  │  & Authorization│   │  Routing      │   │  Limiting      │   │  Documentation │ │
+│  └────────────────┘   └────────────────┘   └────────────────┘   └────────────────┘ │
+└────────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│                                Module Layer                                       │
+│                                                                                    │
+│  ┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐   ┌────────────┐ │
+│  │  User      │   │  Role      │   │  File      │   │  Payment   │   │  Custom    │ │
+│  │  Module    │   │  Module    │   │  Module    │   │  Module    │   │  Modules   │ │
+│  └─────┬──────┘   └─────┬──────┘   └─────┬──────┘   └─────┬──────┘   └─────┬──────┘ │
+│        │                │                │                │                │       │
+│        └────────────────┴────────────────┼────────────────┴────────────────┘       │
+│                                          │                                         │
+└─────────────────────────────────────────┬┴─────────────────────────────────────────┘
+                                          │
+                                          ▼
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│                              Event Communication Layer                             │
+│                                                                                    │
+│  ┌────────────────┐   ┌────────────────┐   ┌────────────────┐   ┌────────────────┐ │
+│  │  Event         │   │  Event         │   │  Event         │   │  Event         │ │
+│  │  Publishers    │   │  Subscribers   │   │  Storage       │   │  Monitor       │ │
+│  └────────────────┘   └────────────────┘   └────────────────┘   └────────────────┘ │
+│                                                                                    │
+│                                  Event Bus                                         │
+└────────────────────────────────────────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│                                 Data Layer                                        │
+│                                                                                    │
+│  ┌────────────────┐   ┌────────────────┐   ┌────────────────┐   ┌────────────────┐ │
+│  │  Database      │   │  Cache         │   │  File          │   │  External      │ │
+│  │  Connector     │   │  Manager       │   │  Storage       │   │  APIs          │ │
+│  └────────────────┘   └────────────────┘   └────────────────┘   └────────────────┘ │
+└────────────────────────────────────────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│                               Persistence Layer                                   │
+│                                                                                    │
+│  ┌────────────────┐   ┌────────────────┐   ┌────────────────┐   ┌────────────────┐ │
+│  │  SQLite        │   │  PostgreSQL    │   │  Object        │   │  Cloud         │ │
+│  │  (Development) │   │  (Production)  │   │  Storage       │   │  Storage       │ │
+│  └────────────────┘   └────────────────┘   └────────────────┘   └────────────────┘ │
+└────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Module Communication Flow
+
+```
+┌────────────┐                                ┌────────────┐
+│            │                                │            │
+│  Module A  │                                │  Module B  │
+│            │                                │            │
+└─────┬──────┘                                └──────┬─────┘
+      │                                              │
+      │  1. Create Event                             │
+      │  (e.g., user.created)                       │
+      │                                              │
+      ▼                                              │
+┌────────────────────────────────────────────────────┴─────┐
+│                                                          │
+│                      Event Bus                           │
+│                                                          │
+└─┬────────────────────────────────────────────────────────┘
+  │                                              ▲
+  │  2. Store Event                             │
+  │                                             │
+  ▼                                             │
+┌────────────┐       3. Notify Subscribers      │
+│            │────────────────────────────────────
+│  Event     │                                 │
+│  Storage   │                                 │
+│            │                                 │
+└────────────┘                                 │
+                                               │
+                                               │
+┌────────────┐      4. Process Event           │
+│            │◄────────────────────────────────┘
+│  Module C  │
+│            │
+└─────┬──────┘
+      │
+      │  5. Create Response Event
+      │  (e.g., notification.sent)
+      │
+      ▼
+┌────────────┐
+│            │
+│  Event Bus │
+│            │
+└────────────┘
+```
+
+### Frontend Component Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                                                                    │
+│                     React Application                              │
+│                                                                    │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  ┌────────────────┐   ┌────────────────┐   ┌────────────────┐     │
+│  │                │   │                │   │                │     │
+│  │   Pages        │   │  Layouts       │   │  Containers    │     │
+│  │                │   │                │   │                │     │
+│  └───────┬────────┘   └───────┬────────┘   └───────┬────────┘     │
+│          │                    │                    │              │
+│          └────────────────────┼────────────────────┘              │
+│                               │                                   │
+│                               ▼                                   │
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │                                                            │   │
+│  │                    Component Library                       │   │
+│  │                                                            │   │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │   │
+│  │  │          │  │          │  │          │  │          │   │   │
+│  │  │  Button  │  │ DataTable│  │   Form   │  │  Other   │   │   │
+│  │  │          │  │          │  │          │  │Components│   │   │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │   │
+│  │                                                            │   │
+│  └────────────────────────────────────────────────────────────┘   │
+│                               ▲                                   │
+│                               │                                   │
+│  ┌────────────────┐   ┌──────┴───────┐   ┌────────────────┐      │
+│  │                │   │              │   │                │      │
+│  │  API Services  │   │  Theme      │   │  Utilities     │      │
+│  │                │   │              │   │                │      │
+│  └────────────────┘   └──────────────┘   └────────────────┘      │
+│                                                                   │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ## Getting Started

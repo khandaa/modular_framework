@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app, g
 
-from backend.core.utils import json_response, validate_json, handle_errors
+from backend.core.utils import APIResponse, validate_json_request, handle_exceptions
 from backend.event_bus import event_bus
 from backend.event_bus.storage import EventStorage
 from backend.event_bus.publisher import EventPublisher
@@ -22,18 +22,28 @@ api_publisher = EventPublisher('event_api')
 # Event storage for persisting events
 event_storage = None
 
-@event_bus_bp.before_app_first_request
+# Event storage initialization flag
+_storage_initialized = False
+
 def setup_event_storage():
-    """Initialize event storage on first request"""
+    """Initialize event storage"""
     global event_storage
     if event_storage is None:
         event_storage = EventStorage()
+
+@event_bus_bp.before_app_request
+def ensure_storage_initialized():
+    """Ensure event storage is initialized before first request"""
+    global _storage_initialized
+    if not _storage_initialized:
+        setup_event_storage()
+        _storage_initialized = True
         # Initialize event bus with storage if not already running
         if not hasattr(event_bus, 'running') or not event_bus.running:
             event_bus.start(event_storage)
 
 @event_bus_bp.route('/', methods=['GET'])
-@handle_errors
+@handle_exceptions
 def get_events():
     """
     Get events with filtering
@@ -61,14 +71,14 @@ def get_events():
         try:
             start_time = datetime.fromisoformat(start_time)
         except ValueError:
-            return json_response({'error': 'Invalid start_time format'}, 400)
+            return APIResponse.error(message='Invalid start_time format', status_code=400)
             
     end_time = request.args.get('end_time')
     if end_time:
         try:
             end_time = datetime.fromisoformat(end_time)
         except ValueError:
-            return json_response({'error': 'Invalid end_time format'}, 400)
+            return APIResponse.error(message='Invalid end_time format', status_code=400)
             
     processed_str = request.args.get('processed')
     processed = None
@@ -80,7 +90,7 @@ def get_events():
         limit = int(request.args.get('limit', 100))
         offset = int(request.args.get('offset', 0))
     except ValueError:
-        return json_response({'error': 'Invalid limit or offset'}, 400)
+        return APIResponse.error(message='Invalid limit or offset', status_code=400)
         
     # Get events from storage
     events = event_storage.get_events(
@@ -95,7 +105,7 @@ def get_events():
     )
     
     # Return events
-    return json_response({
+    return APIResponse.success(data={
         'events': events,
         'count': len(events),
         'limit': limit,
@@ -103,19 +113,19 @@ def get_events():
     })
 
 @event_bus_bp.route('/<event_id>', methods=['GET'])
-@handle_errors
+@handle_exceptions
 def get_event(event_id):
     """Get a specific event by ID"""
     event = event_storage.get_event(event_id)
     
     if not event:
-        return json_response({'error': 'Event not found'}, 404)
+        return APIResponse.error(message='Event not found', status_code=404)
         
-    return json_response(event)
+    return APIResponse.success(data=event)
 
 @event_bus_bp.route('/', methods=['POST'])
-@handle_errors
-@validate_json({
+@handle_exceptions
+@validate_json_request({
     'event_type': {'type': 'string', 'required': True},
     'source_module': {'type': 'string', 'required': True},
     'priority': {'type': 'string', 'required': False},
@@ -155,31 +165,31 @@ def publish_event():
             causation_id=data.get('causation_id')
         )
         
-        return json_response({
+        return APIResponse.success(data={
             'message': 'Event published successfully',
             'event_id': event_id
-        }, 201)
+        }, status_code=201)
         
     except Exception as e:
         logger.error(f"Failed to publish event: {str(e)}", exc_info=True)
-        return json_response({'error': str(e)}, 400)
+        return APIResponse.error(message=str(e), status_code=400)
 
 @event_bus_bp.route('/stats', methods=['GET'])
-@handle_errors
+@handle_exceptions
 def get_event_stats():
     """Get event statistics"""
     stats = event_storage.get_event_stats()
-    return json_response(stats)
+    return APIResponse.success(data=stats)
 
 @event_bus_bp.route('/types', methods=['GET'])
-@handle_errors
+@handle_exceptions
 def get_event_types():
     """Get list of event types with active subscribers"""
     event_types = event_bus.get_event_types()
-    return json_response({'event_types': event_types})
+    return APIResponse.success(data={'event_types': event_types})
 
 @event_bus_bp.route('/modules', methods=['GET'])
-@handle_errors
+@handle_exceptions
 def get_module_subscriptions():
     """
     Get list of modules and their subscriptions
@@ -191,7 +201,7 @@ def get_module_subscriptions():
     
     if module_name:
         subscriptions = event_bus.get_module_subscriptions(module_name)
-        return json_response({
+        return APIResponse.success(data={
             'module': module_name,
             'subscriptions': subscriptions
         })
@@ -201,11 +211,11 @@ def get_module_subscriptions():
         for module, subscriptions in event_bus.subscriptions_by_module.items():
             modules[module] = subscriptions
             
-        return json_response({'modules': modules})
+        return APIResponse.success(data={'modules': modules})
 
 @event_bus_bp.route('/purge', methods=['POST'])
-@handle_errors
-@validate_json({
+@handle_exceptions
+@validate_json_request({
     'older_than': {'type': 'string', 'required': False},
     'event_types': {'type': 'list', 'required': False},
     'processed_only': {'type': 'boolean', 'required': False, 'default': True}
@@ -229,7 +239,7 @@ def purge_events():
         try:
             older_than = datetime.fromisoformat(older_than)
         except ValueError:
-            return json_response({'error': 'Invalid older_than format'}, 400)
+            return APIResponse.error(message='Invalid older_than format', status_code=400)
     
     # Purge events
     count = event_storage.purge_events(
@@ -238,7 +248,7 @@ def purge_events():
         processed_only=data.get('processed_only', True)
     )
     
-    return json_response({
+    return APIResponse.success(data={
         'message': f'Successfully purged {count} events',
         'purged_count': count
     })

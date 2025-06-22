@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
 
-from backend.core.utils import json_response, validate_json, handle_errors
+from backend.core.utils import APIResponse, validate_json_request, handle_exceptions
 from backend.core.db import get_db
 
 logger = logging.getLogger(__name__)
@@ -24,9 +24,12 @@ MODULE_STATUS = {
     'PENDING': 'pending'
 }
 
-@module_registry_bp.before_app_first_request
+# Database initialization flag
+_db_initialized = False
+
+# Initialize database tables
 def setup_module_registry():
-    """Initialize module registry tables on first request"""
+    """Initialize module registry tables"""
     db = get_db()
     cursor = db.cursor()
     
@@ -63,9 +66,17 @@ def setup_module_registry():
     ''')
     
     db.commit()
+    
+@module_registry_bp.before_app_request
+def ensure_db_initialized():
+    """Ensure database is initialized before first request"""
+    global _db_initialized
+    if not _db_initialized:
+        setup_module_registry()
+        _db_initialized = True
 
 @module_registry_bp.route('/', methods=['GET'])
-@handle_errors
+@handle_exceptions
 def list_modules():
     """
     List all registered modules
@@ -115,10 +126,10 @@ def list_modules():
                     
         modules.append(module)
     
-    return json_response({'modules': modules, 'count': len(modules)})
+    return APIResponse.success(data={'modules': modules, 'count': len(modules)})
 
 @module_registry_bp.route('/<module_id>', methods=['GET'])
-@handle_errors
+@handle_exceptions
 def get_module(module_id):
     """Get a specific module by ID"""
     db = get_db()
@@ -128,7 +139,7 @@ def get_module(module_id):
     row = cursor.fetchone()
     
     if not row:
-        return json_response({'error': 'Module not found'}, 404)
+        return APIResponse.error(message='Module not found', status_code=404)
         
     module = dict(row)
     
@@ -149,11 +160,11 @@ def get_module(module_id):
     
     module['events'] = events
     
-    return json_response(module)
+    return APIResponse.success(data=module)
 
 @module_registry_bp.route('/', methods=['POST'])
-@handle_errors
-@validate_json({
+@handle_exceptions
+@validate_json_request({
     'name': {'type': 'string', 'required': True},
     'version': {'type': 'string', 'required': True},
     'description': {'type': 'string', 'required': True},
@@ -171,7 +182,7 @@ def register_module():
     
     # Validate module type
     if data['type'] not in ['backend', 'frontend']:
-        return json_response({'error': 'Invalid module type'}, 400)
+        return APIResponse.error(message='Invalid module type', status_code=400)
     
     # Check if module name+version already exists
     db = get_db()
@@ -183,9 +194,7 @@ def register_module():
     )
     
     if cursor.fetchone():
-        return json_response({
-            'error': 'Module with this name and version already exists'
-        }, 409)
+        return APIResponse.error(message='Module with this name and version already exists', status_code=409)
     
     # Generate module ID
     module_id = str(uuid.uuid4())
@@ -245,14 +254,17 @@ def register_module():
     except ImportError:
         logger.warning("Event bus not available, skipping event publication")
     
-    return json_response({
-        'message': 'Module registered successfully',
-        'module_id': module_id
-    }, 201)
+    return APIResponse.success(
+        data={
+            'message': 'Module registered successfully',
+            'module_id': module_id
+        },
+        status_code=201
+    )
 
 @module_registry_bp.route('/<module_id>', methods=['PUT'])
-@handle_errors
-@validate_json({
+@handle_exceptions
+@validate_json_request({
     'description': {'type': 'string', 'required': False},
     'entry_point': {'type': 'string', 'required': False},
     'config': {'type': 'dict', 'required': False},
@@ -274,7 +286,7 @@ def update_module(module_id):
     module = cursor.fetchone()
     
     if not module:
-        return json_response({'error': 'Module not found'}, 404)
+        return APIResponse.error(message='Module not found', status_code=404)
     
     # Build update query and parameters
     update_fields = []
@@ -301,7 +313,7 @@ def update_module(module_id):
     
     if 'status' in data:
         if data['status'] not in MODULE_STATUS.values():
-            return json_response({'error': 'Invalid module status'}, 400)
+            return APIResponse.error(message='Invalid module status', status_code=400)
             
         update_fields.append("status = ?")
         params.append(data['status'])
@@ -387,13 +399,15 @@ def update_module(module_id):
     
         db.commit()
     
-    return json_response({
-        'message': 'Module updated successfully',
-        'module_id': module_id
-    })
+    return APIResponse.success(
+        data={
+            'message': 'Module updated successfully',
+            'module_id': module_id
+        }
+    )
 
 @module_registry_bp.route('/<module_id>', methods=['DELETE'])
-@handle_errors
+@handle_exceptions
 def delete_module(module_id):
     """Delete a module"""
     db = get_db()
@@ -404,7 +418,7 @@ def delete_module(module_id):
     module = cursor.fetchone()
     
     if not module:
-        return json_response({'error': 'Module not found'}, 404)
+        return APIResponse.error(message='Module not found', status_code=404)
     
     # Delete module events first (foreign key constraint)
     cursor.execute("DELETE FROM module_events WHERE module_id = ?", (module_id,))
@@ -429,18 +443,20 @@ def delete_module(module_id):
     except ImportError:
         logger.warning("Event bus not available, skipping event publication")
     
-    return json_response({
-        'message': 'Module deleted successfully'
-    })
+    return APIResponse.success(
+        data={
+            'message': 'Module deleted successfully'
+        }
+    )
 
 @module_registry_bp.route('/<module_id>/activate', methods=['POST'])
-@handle_errors
+@handle_exceptions
 def activate_module(module_id):
     """Activate a module"""
     return _change_module_status(module_id, MODULE_STATUS['ACTIVE'])
 
 @module_registry_bp.route('/<module_id>/deactivate', methods=['POST'])
-@handle_errors
+@handle_exceptions
 def deactivate_module(module_id):
     """Deactivate a module"""
     return _change_module_status(module_id, MODULE_STATUS['INACTIVE'])
@@ -455,7 +471,7 @@ def _change_module_status(module_id, status):
     module = cursor.fetchone()
     
     if not module:
-        return json_response({'error': 'Module not found'}, 404)
+        return APIResponse.error(message='Module not found', status_code=404)
     
     # Get current status
     current_status = dict(module)['status']
@@ -514,8 +530,10 @@ def _change_module_status(module_id, status):
         except ImportError:
             logger.warning("Event bus not available, skipping event publication")
     
-    return json_response({
-        'message': f'Module {status}',
-        'module_id': module_id,
-        'status': status
-    })
+    return APIResponse.success(
+        data={
+            'message': f'Module {status}',
+            'module_id': module_id,
+            'status': status
+        }
+    )
